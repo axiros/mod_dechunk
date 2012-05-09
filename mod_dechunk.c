@@ -74,6 +74,27 @@ read_complete_body(request_rec *r, apr_bucket_brigade *kept_body)
                         APR_BLOCK_READ,
                         HUGE_STRING_LEN);
 
+        /* This means the filter discovered an error.
+         * Furthermore input-filter already handeld the error and sends
+         * something to the output chain.
+         * For example ap_http_filter does this if LimitRequestBody is reached
+         */
+        if (status == AP_FILTER_ERROR) {
+            apr_brigade_destroy(tmp_bb);
+            return AP_FILTER_ERROR;
+        }
+
+        /* Cool no need to search for the eos bucket */
+        if (status == APR_EOF) {
+            apr_brigade_destroy(tmp_bb);
+            return APR_SUCCESS;
+        }
+
+        if (status != APR_SUCCESS) {
+            apr_brigade_destroy(tmp_bb);
+            return status;
+        }
+
         ITER_BRIGADE(t_bucket1, tmp_bb) {
 
             apr_bucket_copy(t_bucket1, &t_bucket2);
@@ -94,6 +115,7 @@ mod_dechunk_handler(request_rec *r)
 {
     apr_bucket_brigade *kept_body;
     apr_off_t content_length;
+    apr_status_t status;
 
     /* Only run if 'Transfer-Encoding' is chunked */
     const char *tenc = apr_table_get(r->headers_in, "Transfer-Encoding");
@@ -107,7 +129,17 @@ mod_dechunk_handler(request_rec *r)
 
     /* Buffer all incoming data into one brigade */
     kept_body = apr_brigade_create(r->pool, r->connection->bucket_alloc);
-    read_complete_body(r, kept_body);
+    status = read_complete_body(r, kept_body);
+    if (status == AP_FILTER_ERROR) {
+        /* Log is already done by outputfilter */
+        apr_brigade_destroy(kept_body);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
+    if (status != APR_SUCCESS) {
+        ap_log_rerror(APLOG_MARK, APLOG_ERR, status, r, "Cannot read body");
+        apr_brigade_destroy(kept_body);
+        return HTTP_INTERNAL_SERVER_ERROR;
+    }
 
     /* No need for other modules to know about 'Transfer-Encoding' */
     apr_table_unset(r->headers_in, "Transfer-Encoding");
