@@ -66,6 +66,7 @@ read_complete_body(request_rec *r, apr_bucket_brigade *kept_body)
     apr_status_t status;
 
     tmp_bb = apr_brigade_create(r->pool, r->connection->bucket_alloc);
+
     while (!eos_seen) {
         status = ap_get_brigade(
                         r->input_filters,
@@ -85,7 +86,7 @@ read_complete_body(request_rec *r, apr_bucket_brigade *kept_body)
         }
 
         /* Cool no need to search for the eos bucket */
-        if (status == APR_EOF) {
+        if (APR_STATUS_IS_EOF(status)) {
             apr_brigade_destroy(tmp_bb);
             return APR_SUCCESS;
         }
