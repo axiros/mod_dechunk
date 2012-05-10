@@ -8,6 +8,12 @@
 #define ITER_BRIGADE(b, bb) \
     for (b=APR_BRIGADE_FIRST(bb); b!=APR_BRIGADE_SENTINEL(bb); b=APR_BUCKET_NEXT(b))
 
+module AP_MODULE_DECLARE_DATA mod_dechunk;
+
+typedef struct {
+    int dechunk_on;
+} dechunk_cfg;
+
 typedef struct replay_kept_body_filter_ctx {
     apr_bucket_brigade *kept_body;
     apr_off_t offset;
@@ -137,6 +143,12 @@ mod_dechunk_handler(request_rec *r)
     apr_bucket_brigade *kept_body;
     apr_off_t content_length;
     apr_status_t status;
+    dechunk_cfg *cfg;
+
+    cfg = (dechunk_cfg*) ap_get_module_config(r->server->module_config, &mod_dechunk);
+    if (cfg->dechunk_on == 0) {
+        return DECLINED;
+    }
 
     /* Only run if 'Transfer-Encoding' is chunked */
     const char *tenc = apr_table_get(r->headers_in, "Transfer-Encoding");
@@ -203,12 +215,49 @@ register_hooks(apr_pool_t *pool)
             AP_FTYPE_RESOURCE);
 }
 
+static void *
+create_dechunk_config(apr_pool_t *p, server_rec *s)
+{
+    dechunk_cfg *cfg = apr_pcalloc(p, sizeof(dechunk_cfg));
+    cfg->dechunk_on = 0;
+
+    return cfg;
+}
+
+static void *
+merge_dechunk_config(apr_pool_t *p, void *basev, void *overridesv)
+{
+    dechunk_cfg *cfg = apr_pcalloc(p, sizeof(dechunk_cfg));
+    dechunk_cfg *override = (dechunk_cfg *) overridesv;
+
+    cfg->dechunk_on = override->dechunk_on;
+
+    return cfg;
+}
+
+static const char *
+cmd_dechunk_engine(cmd_parms *params, void *dummy, int flag)
+{
+    dechunk_cfg *cfg = ap_get_module_config(params->server->module_config, &mod_dechunk);
+
+    cfg->dechunk_on = flag;
+    return NULL;
+}
+
+static const command_rec dechunk_cmds[] = {
+    AP_INIT_FLAG("DechunkEngine", cmd_dechunk_engine, NULL, RSRC_CONF,
+            "On or Off to enable or disable mod_dechunk"),
+
+    { NULL }
+};
+
+
 module AP_MODULE_DECLARE_DATA mod_dechunk = {
     STANDARD20_MODULE_STUFF,
-    NULL, /*Dir config*/
-    NULL, /*Merge dir config*/
-    NULL, /*Server config */
-    NULL, /*Server merge */
-    NULL, /*Commands*/
+    NULL,                       /*Dir config*/
+    NULL,                       /*Merge dir config*/
+    create_dechunk_config,      /*Server config */
+    merge_dechunk_config,       /*Server merge */
+    dechunk_cmds,               /*Commands*/
     register_hooks,
 };
