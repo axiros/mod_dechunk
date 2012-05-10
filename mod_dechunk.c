@@ -24,6 +24,7 @@ mod_dechunk_replay_kept_body(
 {
     apr_bucket *ec, *e2;
     replay_ctx_t *ctx = f->ctx;
+    apr_status_t status;
 
     /* just get out of the way of things we don't want. */
     if (mode != AP_MODE_READBYTES && mode != AP_MODE_GETLINE) {
@@ -39,9 +40,29 @@ mod_dechunk_replay_kept_body(
         readbytes = ctx->remaining;
     }
 
-    /* TODO: Error checking would be good here */
-    apr_brigade_partition(ctx->kept_body, ctx->offset, &ec);
-    apr_brigade_partition(ctx->kept_body, ctx->offset + readbytes, &e2);
+    status = apr_brigade_partition(ctx->kept_body, ctx->offset, &ec);
+    if (status != APR_SUCCESS) {
+        ap_log_rerror(
+                APLOG_MARK,
+                APLOG_ERR,
+                status,
+                f->r,
+                "apr_brigade_partition() failed at offset %" APR_OFF_T_FMT,
+                ctx->offset);
+        return status;
+    }
+
+    status = apr_brigade_partition(ctx->kept_body, ctx->offset + readbytes, &e2);
+    if (status != APR_SUCCESS) {
+        ap_log_rerror(
+                APLOG_MARK,
+                APLOG_ERR,
+                status,
+                f->r,
+                "apr_brigade_partition() failed at offset + readbytes %" APR_OFF_T_FMT,
+                ctx->offset + readbytes);
+        return status;
+    }
 
     do {
         apr_bucket *tmp;
@@ -54,7 +75,6 @@ mod_dechunk_replay_kept_body(
     ctx->offset += readbytes;
     return APR_SUCCESS;
 }
-
 
 
 static apr_status_t
