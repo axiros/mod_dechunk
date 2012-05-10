@@ -1,0 +1,2 @@
+debian/conf/dechunk.load /etc/apache2/mods-available/
+.libs/mod_dechunk.so /usr/lib/apache2/modules/

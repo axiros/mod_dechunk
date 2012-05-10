@@ -1,0 +1,11 @@
+Source: mod-dechunk
+Section: web
+Priority: optional
+Maintainer: Stephan Hofmockel <dreagonfly@gmx.de>
+Build-Depends: debhelper (>= 4.0.0), apache2-threaded-dev (>> 2.2)
+Standards-Version: 3.8.0
+
+Package: libapache2-mod-dechunk
+Architecture: any
+Depends: ${shlibs:Depends}, apache2, apache2.2-common
+Description: Apache module which reads all incoming data into memory to replace 'Transfer-Encoding: chunked' with a Content-Length
