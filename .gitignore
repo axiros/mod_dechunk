@@ -10,3 +10,11 @@
 *.lai
 *.la
 *.a
+
+# Debian build crufts
+/debian/debhelper.log
+/debian/files
+/debian/libapache2-mod-dechunk.debhelper.log
+/debian/libapache2-mod-dechunk.substvars
+/debian/libapache2-mod-dechunk/
+/debian/substvars
