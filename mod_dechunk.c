@@ -125,6 +125,15 @@ read_complete_body(request_rec *r, apr_bucket_brigade *kept_body)
         ITER_BRIGADE(t_bucket1, tmp_bb) {
 
             apr_bucket_copy(t_bucket1, &t_bucket2);
+
+            /* If SSL is used TRANSIENT buckets are returned.
+             * However we need this bucket for a longer period than
+             * this function call, hence 'setaside' the bucket.
+             */
+            if APR_BUCKET_IS_TRANSIENT(t_bucket2) {
+                apr_bucket_setaside(t_bucket2, r->pool);
+            }
+
             APR_BRIGADE_INSERT_TAIL(kept_body, t_bucket2);
 
             if (!eos_seen && APR_BUCKET_IS_EOS(t_bucket1)) {
